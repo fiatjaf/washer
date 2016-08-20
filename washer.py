@@ -39,9 +39,10 @@ if lang:
                    'Defaults to a temporary directory.')
 def main(indexdir):
     global dir
-
-    os.makedirs(indexdir, exist_ok=True)
     dir = indexdir
+
+    if not os.path.exists(dir):
+        os.makedirs(dir)
 
 
 @main.command()
@@ -78,8 +79,9 @@ def index(lang, files_to_index):
     for path in files_to_index:
         click.echo('indexing {}'.format(path))
         try:
-            with open(path) as f:
-                writer.add_document(path=path, content=f.read())
+            with open(path, 'rb') as f:
+                content = readfile(f)
+                writer.add_document(path=path, content=content)
             nindexed += 1
         except (NotFound, IsDirectory):
             click.echo('  not found.')
@@ -103,12 +105,14 @@ def search(query):
         query = QueryParser('content', ix.schema).parse(query)
         results = searcher.search(query)
         results.fragmenter.charlimit = 1000000
+        results.fragmenter.maxchars = 200
+        results.fragmenter.surround = 30
         results.formatter = ShellFormatter()
         for hit in results:
             click.echo('  {}'.format(color.magenta_bold(hit['path'])))
             try:
-                with open(hit['path']) as f:
-                    content = f.read()
+                with open(hit['path'], 'rb') as f:
+                    content = readfile(f)
                     click.echo(hit.highlights('content', text=content, top=5))
             except NotFound:
                 pass
@@ -122,8 +126,7 @@ class ShellFormatter(Formatter):
         return '\n'.join(out)
 
     def format_fragment(self, fragment):
-        text = fragment.text[fragment.startchar:fragment.endchar] \
-            .replace('\n', '¶ ')
+        text = fragment.text[fragment.startchar:fragment.endchar]
 
         shifted = fragment.startchar
         output = ''
@@ -145,7 +148,23 @@ class ShellFormatter(Formatter):
         output += text
         output += color.normal
 
-        return output
+        return output \
+            .replace('\n\r', '¶ ') \
+            .replace('\r', '¶ ') \
+            .replace('\n', '¶ ')
+
+
+def readfile(f):  # this expects a file object opened with open(<path>, 'rb')
+    bytecontents = f.read()
+    for tryencoding in ['utf-8', 'cp1252', 'latin_1', 'euc-jp',
+                        'gb2312', 'cp1251', 'sjis', 'iso-8859-2']:
+        try:
+            return bytecontents.decode(tryencoding)
+        except UnicodeDecodeError:
+            pass
+    else:
+        return bytecontents.decode('ascii', 'ignore')
+
 
 if __name__ == '__main__':
     main()
