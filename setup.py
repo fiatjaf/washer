@@ -5,7 +5,7 @@ with open('README.rst') as f:
 
 setup(
     name='washer',
-    version='0.5',
+    version='0.6',
     py_modules=['washer'],
     install_requires=[
         'Click',

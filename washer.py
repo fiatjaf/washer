@@ -3,6 +3,7 @@ import click
 import tempfile
 from whoosh import index as idx
 from whoosh.lang import NoStemmer, NoStopWords, languages
+from whoosh.query import Every
 from whoosh.fields import Schema, TEXT, ID
 from whoosh.qparser import QueryParser
 from whoosh.analysis import SimpleAnalyzer, CharsetFilter
@@ -34,7 +35,7 @@ if lang:
 @click.group()
 @click.option('--indexdir', '-d',
               type=click.Path(file_okay=False, writable=True),
-              default=defaultdir,
+              default=defaultdir, metavar='<INDEX_DIR>',
               help='The directory in which the index files will be kept. '
                    'Defaults to a temporary directory.')
 def main(indexdir):
@@ -56,40 +57,73 @@ def main(indexdir):
                         ' '.join('-l ' + l for l in defaultlangs)
                     )
               )
+@click.option('--overwrite', '-w', is_flag=True, default=None,
+              help='Overwrite existing index in INDEX_DIR, if exists.'
+                   'Defaults to false unless INDEX_DIR is not specified.')
+@click.option('--append', '-a', is_flag=True, default=None,
+              help='Append files to the index in INDEX_DIR, if it exists.'
+                   'Defaults to true unless INDEX_DIR is not specified.')
 @click.argument('files_to_index', type=click.Path(), nargs=-1)
-def index(lang, files_to_index):
+def index(lang, overwrite, append, files_to_index):
     '''Creates or overwrites and index at an specified location
        using the given files.
 
        FILES_TO_INDEX accepts multiple files and wildcards, as usual.
     '''
 
-    chain = SimpleAnalyzer()
-    for l in lang:
-        lang = l.strip()
-        try:
-            chain = chain | StopFilter(lang=lang, maxsize=40)
-        except NoStopWords:
-            pass
-        try:
-            chain = chain | StemFilter(lang=lang)
-        except NoStemmer:
-            pass
-    chain = chain | CharsetFilter(accent_map)
-    schema = Schema(path=ID(stored=True), content=TEXT(analyzer=chain))
+    if dir == defaultdir:
+        if overwrite is None:
+            overwrite = True
+        if append is None:
+            append = False
 
-    ix = idx.create_in(dir, schema)
+    exists = idx.exists_in(dir)
+    if overwrite and not append or not exists:
+        if exists:
+            click.echo('overwriting index at {}...'.format(dir))
+        else:
+            click.echo('creating index at {}...'.format(dir))
+
+        chain = SimpleAnalyzer()
+        for l in lang:
+            lang = l.strip()
+            try:
+                chain = chain | StopFilter(lang=lang, maxsize=40)
+            except NoStopWords:
+                pass
+            try:
+                chain = chain | StemFilter(lang=lang)
+            except NoStemmer:
+                pass
+        chain = chain | CharsetFilter(accent_map)
+        schema = Schema(path=ID(stored=True), content=TEXT(analyzer=chain))
+
+        ix = idx.create_in(dir, schema)
+
+    else:
+        click.echo('appending files to index at {}...'.format(dir))
+        ix = idx.open_dir(dir)
+
+        with ix.searcher() as searcher:
+            not_already_indexed = []
+            for path in files_to_index:
+                path = os.path.abspath(path)
+                docnum = searcher.document_number(path=path)
+                if not docnum:
+                    not_already_indexed.append(path)
+        files_to_index = not_already_indexed
+
     writer = ix.writer()
 
     nindexed = 0
     for path in files_to_index:
         path = os.path.abspath(path)
-        click.echo('indexing {}'.format(path))
+        click.echo('  indexing {}'.format(path))
         try:
             with open(path, 'rb') as f:
                 content = readfile(f)
                 writer.add_document(path=path, content=content)
-            nindexed += 1
+                nindexed += 1
         except (NotFound, IsDirectory):
             click.echo('  not found.')
 
@@ -102,14 +136,21 @@ def index(lang, files_to_index):
 
 
 @main.command()
+@click.option('--listall', is_flag=True, default=False,
+              help='List all indexed documents.')
 @click.argument('term', type=str, default='')
-def info(term):
+def info(listall, term):
     '''Display information about the index and optionally about the
        a term status on the index.
     '''
 
     ix = idx.open_dir(dir)
     with ix.searcher() as searcher:
+        if listall:
+            for hit in searcher.search(Every(), limit=None):
+                click.echo('  ' + os.path.relpath(hit["path"]))
+            return
+
         click.echo('The index at {} has {} documents.'.format(
             dir, int(searcher.doc_count_all())))
 
@@ -142,6 +183,10 @@ def morelike(path):
     ix = idx.open_dir(dir)
     with ix.searcher() as searcher:
         docnum = searcher.document_number(path=path)
+        if not docnum:
+            click.echo('  {} is not indexed.'.format(relpath))
+            return
+
         results = searcher.more_like(docnum, 'content',
                                      numterms=20, text=content)
         for hit in results:
