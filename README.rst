@@ -15,6 +15,13 @@ With pip or (better) `pipsi <https://github.com/mitsuhiko/pipsi>`:
     # or `sudo pip3 install washer`
 
 
+Quickstart
+----------
+
+.. image:: https://raw.githubusercontent.com/fiatjaf/washer/master/example/screenshot.png
+Or see https://github.com/fiatjaf/washer/tree/master/example.
+
+
 Usage
 -----
 
@@ -69,4 +76,4 @@ Usage
 License
 -------
 
-This tool is licensed in the same way as Whoosh, as long as it complies with requirements from the other two dependencies, Click and blessings.
+This tool is licensed in the same way as Whoosh, as long as it complies with requirements from the other two dependencies, click and blessings.
