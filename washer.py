@@ -58,10 +58,10 @@ def main(indexdir):
                     )
               )
 @click.option('--overwrite', '-w', is_flag=True, default=None,
-              help='Overwrite existing index in INDEX_DIR, if exists.'
+              help='Overwrite existing index in INDEX_DIR, if exists. '
                    'Defaults to false unless INDEX_DIR is not specified.')
 @click.option('--append', '-a', is_flag=True, default=None,
-              help='Append files to the index in INDEX_DIR, if it exists.'
+              help='Append files to the index in INDEX_DIR, if it exists. '
                    'Defaults to true unless INDEX_DIR is not specified.')
 @click.argument('files_to_index', type=click.Path(), nargs=-1)
 def index(lang, overwrite, append, files_to_index):

@@ -44,17 +44,23 @@ Usage
 ::
 
     Usage: washer index [OPTIONS] [FILES_TO_INDEX]...
-    
+
       Creates or overwrites and index at an specified location using the given
       files.
-    
+
       FILES_TO_INDEX accepts multiple files and wildcards, as usual.
-    
+        
     Options:
       -l, --lang [ar|da|nl|en|fi|fr|de|hu|it|no|pt|ro|ru|es|sv|tr]
                                       Comma-separated list of languages to use
                                       when indexing. Should be specified multiple
                                       times. Defaults to "-l pt -l en".
+      -w, --overwrite                 Overwrite existing index in INDEX_DIR, if
+                                      exists. Defaults to false unless INDEX_DIR
+                                      is not specified.
+      -a, --append                    Append files to the index in INDEX_DIR, if
+                                      it exists. Defaults to true unless INDEX_DIR
+                                      is not specified.
       --help                          Show this message and exit.
 
 
