@@ -77,6 +77,7 @@ def index(lang, files_to_index):
 
     nindexed = 0
     for path in files_to_index:
+        path = os.path.abspath(path)
         click.echo('indexing {}'.format(path))
         try:
             with open(path, 'rb') as f:
@@ -92,9 +93,6 @@ def index(lang, files_to_index):
                    .format(nindexed, dir))
     else:
         click.echo('no files were indexed.')
-
-    with open(os.path.join(dir, 'washer_metadata'), 'w') as f:
-        f.write('basedir:{}'.format(os.getcwd()))
 
 
 @main.command()
@@ -115,15 +113,37 @@ def info(term):
 
 
 @main.command()
+@click.argument('path', type=click.Path(exists=True, dir_okay=False))
+def morelike(path):
+    path = os.path.abspath(path)
+    relpath = os.path.relpath(path)
+
+    try:
+        with open(path, 'rb') as f:
+            content = readfile(f)
+            click.echo('searching files like {}.'.format(color.blue(relpath)))
+    except NotFound:
+        click.echo('{} not found. It is needed to be present for morelike to work.'
+                   .format(relpath))
+        return
+
+    ix = idx.open_dir(dir)
+    with ix.searcher() as searcher:
+        docnum = searcher.document_number(path=path)
+        results = searcher.more_like(docnum, 'content', numterms=20, text=content)
+        for hit in results:
+            click.echo('  ' + os.path.relpath(hit["path"]))
+
+
+@main.command()
 @click.argument('query', type=str, nargs=-1)
 @click.option('--count', is_flag=True,
               help='Force counting results. A mostly useless flag.')
-def search(query, count):
+@click.option('--frag/--no-frag', default=True,
+              help='Show text fragments of the files that matched. Enabled by default.')
+def search(query, count, frag):
     squery = ' '.join(query)
     click.echo('searching for {}...'.format(color.green(squery)))
-
-    with open(os.path.join(dir, 'washer_metadata')) as f:
-        basedir = f.read().split(':')[1].strip()
 
     ix = idx.open_dir(dir)
     with ix.searcher() as searcher:
@@ -134,18 +154,20 @@ def search(query, count):
         results.fragmenter.surround = 40
         results.formatter = ShellFormatter()
         for hit in results:
-            path = os.path.relpath(os.path.join(basedir, hit['path']))
+            path = os.path.relpath(os.path.join(hit['path']))
             click.echo('  {}'.format(color.magenta_bold(path)))
-            try:
-                with open(path, 'rb') as f:
-                    content = readfile(f)
-                    click.echo(hit.highlights('content', text=content, top=5))
-            except NotFound:
-                if len(query) > 1:
-                    click.echo('    matched: ' + ', '.join(
-                        color.green_underline(term.decode('utf-8'))
-                        for _, term in hit.matched_terms())
-                    )
+            if frag:
+                try:
+                    with open(path, 'rb') as f:
+                        content = readfile(f)
+                        click.echo(hit.highlights('content',
+                                                  text=content, top=4))
+                except NotFound:
+                    if len(query) > 1:
+                        click.echo('    matched: ' + ', '.join(
+                            color.green_underline(term.decode('utf-8'))
+                            for _, term in hit.matched_terms())
+                        )
 
         if count or results.has_exact_length():
             click.echo('found {} results. {} were scored.'.format(
