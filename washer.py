@@ -58,6 +58,12 @@ def main(indexdir):
               )
 @click.argument('files_to_index', type=click.Path(), nargs=-1)
 def index(lang, files_to_index):
+    '''Creates or overwrites and index at an specified location
+       using the given files.
+
+       FILES_TO_INDEX accepts multiple files and wildcards, as usual.
+    '''
+
     chain = SimpleAnalyzer()
     for l in lang:
         lang = l.strip()
@@ -99,7 +105,9 @@ def index(lang, files_to_index):
 @click.argument('term', type=str, default='')
 def info(term):
     '''Display information about the index and optionally about the
-       a term status on the index.'''
+       a term status on the index.
+    '''
+
     ix = idx.open_dir(dir)
     with ix.searcher() as searcher:
         click.echo('The index at {} has {} documents.'.format(
@@ -115,6 +123,10 @@ def info(term):
 @main.command()
 @click.argument('path', type=click.Path(exists=True, dir_okay=False))
 def morelike(path):
+    '''Lists files present at the index
+       that share terms with the file at the given PATH.
+    '''
+
     path = os.path.abspath(path)
     relpath = os.path.relpath(path)
 
@@ -123,14 +135,15 @@ def morelike(path):
             content = readfile(f)
             click.echo('searching files like {}.'.format(color.blue(relpath)))
     except NotFound:
-        click.echo('{} not found. It is needed to be present for morelike to work.'
+        click.echo('{} not found. It has to be present for morelike to work.'
                    .format(relpath))
         return
 
     ix = idx.open_dir(dir)
     with ix.searcher() as searcher:
         docnum = searcher.document_number(path=path)
-        results = searcher.more_like(docnum, 'content', numterms=20, text=content)
+        results = searcher.more_like(docnum, 'content',
+                                     numterms=20, text=content)
         for hit in results:
             click.echo('  ' + os.path.relpath(hit["path"]))
 
@@ -140,8 +153,16 @@ def morelike(path):
 @click.option('--count', is_flag=True,
               help='Force counting results. A mostly useless flag.')
 @click.option('--frag/--no-frag', default=True,
-              help='Show text fragments of the files that matched. Enabled by default.')
+              help='Show text fragments of the files that matched.' +
+                   'Enabled by default.')
 def search(query, count, frag):
+    '''Search the given index for a term or multiple terms.
+
+       QUERY can be anything, typically it will be just one or a bunch
+       of words, but it accepts special operators (NOT, AND, *, ? etc.) as
+       specified in http://whoosh.readthedocs.io/en/latest/querylang.html
+    '''
+
     squery = ' '.join(query)
     click.echo('searching for {}...'.format(color.green(squery)))
 
