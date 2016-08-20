@@ -1,0 +1,8 @@
+*.swp
+*.swo
+*.pyo
+*.pyc
+venv
+build
+sdist
+bdist
