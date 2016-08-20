@@ -2,7 +2,7 @@
 washer
 ======
 Create fulltext indexes with your files and query them from the command line.
-------
+-----------------------------------------------------------------------------
 
 Install
 -------
@@ -19,6 +19,7 @@ Quickstart
 ----------
 
 .. image:: https://raw.githubusercontent.com/fiatjaf/washer/master/example/screenshot.png
+
 Or see https://github.com/fiatjaf/washer/tree/master/example.
 
 
