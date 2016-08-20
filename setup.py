@@ -1,8 +1,11 @@
 from setuptools import setup
 
+with open('README.rst') as f:
+    long_description = f.read()
+
 setup(
     name='washer',
-    version='0.4',
+    version='0.5',
     py_modules=['washer'],
     install_requires=[
         'Click',
@@ -18,5 +21,5 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     url='https://github.com/fiatjaf/washer',
-    long_description=open('README.rst').read()
+    long_description=long_description
 )

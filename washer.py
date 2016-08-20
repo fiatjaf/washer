@@ -191,7 +191,7 @@ def search(query, count, frag):
                         )
 
         if count or results.has_exact_length():
-            click.echo('found {} results. {} were scored.'.format(
+            click.echo('found {} results. {} scored.'.format(
                 len(results), results.scored_length()))
         else:
             min = results.estimated_min_length()
