@@ -93,29 +93,69 @@ def index(lang, files_to_index):
     else:
         click.echo('no files were indexed.')
 
+    with open(os.path.join(dir, 'washer_metadata'), 'w') as f:
+        f.write('basedir:{}'.format(os.getcwd()))
+
+
+@main.command()
+@click.argument('term', type=str, default='')
+def info(term):
+    '''Display information about the index and optionally about the
+       a term status on the index.'''
+    ix = idx.open_dir(dir)
+    with ix.searcher() as searcher:
+        click.echo('The index at {} has {} documents.'.format(
+            dir, int(searcher.doc_count_all())))
+
+        if term:
+            click.echo('"{}" occurs {} times.'.format(
+                term, int(searcher.frequency('content', term))))
+            click.echo('"{}" occurs in {} documents.'.format(
+                term, int(searcher.doc_frequency('content', term))))
+
 
 @main.command()
 @click.argument('query', type=str, nargs=-1)
-def search(query):
-    query = ' '.join(query)
-    click.echo('searching for {}...'.format(color.green(query)))
+@click.option('--count', is_flag=True,
+              help='Force counting results. A mostly useless flag.')
+def search(query, count):
+    squery = ' '.join(query)
+    click.echo('searching for {}...'.format(color.green(squery)))
+
+    with open(os.path.join(dir, 'washer_metadata')) as f:
+        basedir = f.read().split(':')[1].strip()
 
     ix = idx.open_dir(dir)
     with ix.searcher() as searcher:
-        query = QueryParser('content', ix.schema).parse(query)
-        results = searcher.search(query)
+        pquery = QueryParser('content', ix.schema).parse(squery)
+        results = searcher.search(pquery, terms=True)
         results.fragmenter.charlimit = 1000000
         results.fragmenter.maxchars = 200
-        results.fragmenter.surround = 30
+        results.fragmenter.surround = 40
         results.formatter = ShellFormatter()
         for hit in results:
-            click.echo('  {}'.format(color.magenta_bold(hit['path'])))
+            path = os.path.relpath(os.path.join(basedir, hit['path']))
+            click.echo('  {}'.format(color.magenta_bold(path)))
             try:
-                with open(hit['path'], 'rb') as f:
+                with open(path, 'rb') as f:
                     content = readfile(f)
                     click.echo(hit.highlights('content', text=content, top=5))
             except NotFound:
-                pass
+                if len(query) > 1:
+                    click.echo('    matched: ' + ', '.join(
+                        color.green_underline(term.decode('utf-8'))
+                        for _, term in hit.matched_terms())
+                    )
+
+        if count or results.has_exact_length():
+            click.echo('found {} results. {} were scored.'.format(
+                len(results), results.scored_length()))
+        else:
+            min = results.estimated_min_length()
+            max = results.estimated_length()
+            estimated = min if min == max else 'around %s, %s' % (min, max)
+            click.echo('{} scored results from a total of {}.'.format(
+                results.scored_length(), estimated))
 
 
 class ShellFormatter(Formatter):
